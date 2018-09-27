@@ -637,8 +637,10 @@ static int read_times(unsigned int numcpus, uv_cpu_info_t* ci) {
   if (fp == NULL)
     return -1;
 
-  if (!fgets(buf, sizeof(buf), fp))
-    abort();
+  if (!fgets(buf, sizeof(buf), fp)) {
+    fclose(fp);
+    return -1;
+  }
 
   num = 0;
 
