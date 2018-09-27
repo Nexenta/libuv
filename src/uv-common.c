@@ -134,6 +134,8 @@ int uv__set_sys_error(uv_loop_t* loop, int sys_error) {
 
 
 int uv__set_artificial_error(uv_loop_t* loop, uv_err_code code) {
+  if (!loop)
+    return -1;
   loop->last_err = uv__new_artificial_error(code);
   return -1;
 }
