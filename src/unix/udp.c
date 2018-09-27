@@ -190,8 +190,11 @@ static void uv__udp_recvmsg(uv_loop_t* loop,
   struct sockaddr_storage peer;
   struct msghdr h;
   uv_udp_t* handle;
-  ssize_t nread;
+  ssize_t nread, npeek;
   uv_buf_t buf;
+#define PEEKBUF_SIZE (1024)
+  char peekdata[PEEKBUF_SIZE];
+  uv_buf_t peekbuf;
   int flags;
   int count;
 
@@ -207,22 +210,54 @@ static void uv__udp_recvmsg(uv_loop_t* loop,
    */
   count = 32;
 
-  memset(&h, 0, sizeof(h));
-  h.msg_name = &peer;
-
   do {
-    buf = handle->alloc_cb((uv_handle_t*)handle, 64 * 1024);
-    assert(buf.len > 0);
-    assert(buf.base != NULL);
-
-    h.msg_namelen = sizeof(peer);
-    h.msg_iov = (void*) &buf;
-    h.msg_iovlen = 1;
-
     do {
-      nread = recvmsg(handle->io_watcher.fd, &h, 0);
+
+      /* we may get out of inner loop sooner in case of handle error */
+      if (handle->io_watcher.fd == -1 || !handle->alloc_cb)
+        break;
+
+      memset(&h, 0, sizeof(h));
+      h.msg_name = &peer;
+      h.msg_namelen = sizeof(peer);
+      h.msg_iov = (void*) &peekbuf;
+      h.msg_iovlen = 1;
+      peekbuf.base = &peekdata[0];
+      peekbuf.len = PEEKBUF_SIZE;
+
+      npeek = recvmsg(handle->io_watcher.fd, &h, MSG_PEEK|MSG_TRUNC);
+
+/*printf("count %d npeek %ld flag %d peekbuf.len %ld\n", count, npeek, h.msg_flags, peekbuf.len);*/
+      buf = handle->alloc_cb((uv_handle_t*)handle, npeek == -1 ? 1 : npeek);
+      assert(buf.len > 0);
+      assert(buf.base != NULL);
+
+      if (npeek >= 0) {
+
+        memset(&h, 0, sizeof(h));
+        h.msg_name = &peer;
+        h.msg_namelen = sizeof(peer);
+        h.msg_iovlen = 1;
+
+        if (npeek < PEEKBUF_SIZE) {
+          memcpy(buf.base, peekbuf.base, npeek);
+	  peekbuf.len = 1; /* copied, discard data */
+          h.msg_iov = (void*) &peekbuf;
+        } else {
+          h.msg_iov = (void*) &buf;
+        }
+        nread = recvmsg(handle->io_watcher.fd, &h, 0);
+/*printf("nread %ld iov_len %ld\n", nread, h.msg_iov->iov_len);*/
+        if (nread == 1 && peekbuf.len == 1) /* discard case */
+          nread = npeek;
+      } else
+        nread = -1;
     }
     while (nread == -1 && errno == EINTR);
+
+    /* we may get out of inner loop sooner in case of handle error */
+    if (handle->io_watcher.fd == -1 || !handle->recv_cb)
+      break;
 
     if (nread == -1) {
       if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -240,6 +275,7 @@ static void uv__udp_recvmsg(uv_loop_t* loop,
       if (h.msg_flags & MSG_TRUNC)
         flags |= UV_UDP_PARTIAL;
 
+/*printf("CALL nread %ld buf.len %ld\n", nread, buf.len);*/
       handle->recv_cb(handle,
                       nread,
                       buf,
