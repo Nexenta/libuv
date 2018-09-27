@@ -123,7 +123,8 @@ enum {
   UV_STREAM_BLOCKING  = 0x80,   /* Synchronous writes. */
   UV_TCP_NODELAY      = 0x100,  /* Disable Nagle. */
   UV_TCP_KEEPALIVE    = 0x200,  /* Turn on keep-alive. */
-  UV_TCP_SINGLE_ACCEPT = 0x400  /* Only accept() when idle. */
+  UV_TCP_SINGLE_ACCEPT = 0x400, /* Only accept() when idle. */
+  UV_HANDLE_IPV6      = 0x01000000 /* Indicate socket is IPv6. */
 };
 
 /* loop flags */

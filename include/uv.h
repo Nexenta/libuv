@@ -1497,6 +1497,7 @@ struct uv_cpu_info_s {
 struct uv_interface_address_s {
   char* name;
   int is_internal;
+  uint32_t if_index;
   union {
     struct sockaddr_in address4;
     struct sockaddr_in6 address6;
