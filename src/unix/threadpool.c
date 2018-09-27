@@ -22,14 +22,14 @@
 #include "internal.h"
 #include <stdlib.h>
 
-#define MAX_THREADPOOL_SIZE 128
-
+#define MAX_THREADPOOL_SIZE 1024
+#define DEFAULT_THREADS_SIZE 128
 static uv_once_t once = UV_ONCE_INIT;
 static uv_cond_t cond;
 static uv_mutex_t mutex;
 static unsigned int nthreads;
 static uv_thread_t* threads;
-static uv_thread_t default_threads[4];
+static uv_thread_t default_threads[DEFAULT_THREADS_SIZE];
 static ngx_queue_t exit_message;
 static ngx_queue_t wq;
 static volatile int initialized;
@@ -46,8 +46,14 @@ static void uv__cancelled(struct uv__work* w) {
 static void worker(void* arg) {
   struct uv__work* w;
   ngx_queue_t* q;
+  struct sched_param params;
 
   (void) arg;
+
+  /* high priority workers */
+  memset(&params, 0, sizeof (params));
+  params.sched_priority = 0;
+  pthread_setschedparam(pthread_self(), SCHED_OTHER, &params);
 
   for (;;) {
     uv_mutex_lock(&mutex);
@@ -71,6 +77,8 @@ static void worker(void* arg) {
       break;
 
     w = ngx_queue_data(q, struct uv__work, wq);
+    if (!w || !w->work)
+      break;
     w->work(w);
 
     uv_mutex_lock(&w->loop->wq_mutex);
