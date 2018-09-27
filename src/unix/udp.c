@@ -58,7 +58,10 @@ void uv__udp_finish_close(uv_udp_t* handle) {
   ngx_queue_t* q;
 
   assert(!uv__io_active(&handle->io_watcher, UV__POLLIN | UV__POLLOUT));
-  assert(handle->io_watcher.fd == -1);
+  if (handle->io_watcher.fd != -1) {
+    close(handle->io_watcher.fd);
+    handle->io_watcher.fd = -1;
+  }
 
   uv__udp_run_completed(handle);
 
