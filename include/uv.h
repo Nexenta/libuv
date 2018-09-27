@@ -1496,6 +1496,7 @@ struct uv_cpu_info_s {
 
 struct uv_interface_address_s {
   char* name;
+  char phys_addr[6];
   int is_internal;
   uint32_t if_index;
   union {

@@ -44,6 +44,9 @@
 #endif
 #ifdef HAVE_IFADDRS_H
 # include <ifaddrs.h>
+# include <sys/socket.h>
+# include <net/ethernet.h>
+# include <linux/if_packet.h>
 #endif
 
 #undef NANOSEC
@@ -723,8 +726,9 @@ uv_err_t uv_interface_addresses(uv_interface_address_t** addresses,
   return uv__new_artificial_error(UV_ENOSYS);
 #else
   struct ifaddrs *addrs, *ent;
-  char ip[INET6_ADDRSTRLEN];
   uv_interface_address_t* address;
+  int i;
+  struct sockaddr_ll *sll;
 
   if (getifaddrs(&addrs) != 0) {
     return uv__new_sys_error(errno);
@@ -734,7 +738,7 @@ uv_err_t uv_interface_addresses(uv_interface_address_t** addresses,
 
   /* Count the number of interfaces */
   for (ent = addrs; ent != NULL; ent = ent->ifa_next) {
-    if (!(ent->ifa_flags & IFF_UP && ent->ifa_flags & IFF_RUNNING) ||
+    if (!((ent->ifa_flags & IFF_UP) && (ent->ifa_flags & IFF_RUNNING)) ||
         (ent->ifa_addr == NULL) ||
         (ent->ifa_addr->sa_family == PF_PACKET)) {
       continue;
@@ -752,22 +756,18 @@ uv_err_t uv_interface_addresses(uv_interface_address_t** addresses,
   address = *addresses;
 
   for (ent = addrs; ent != NULL; ent = ent->ifa_next) {
-    bzero(&ip, sizeof (ip));
-    if (!(ent->ifa_flags & IFF_UP && ent->ifa_flags & IFF_RUNNING)) {
+    if (!((ent->ifa_flags & IFF_UP) && (ent->ifa_flags & IFF_RUNNING)))
       continue;
-    }
 
-    if (ent->ifa_addr == NULL) {
+    if (ent->ifa_addr == NULL)
       continue;
-    }
 
     /*
      * On Linux getifaddrs returns information related to the raw underlying
-     * devices. We're not interested in this information.
+     * devices. We're not interested in this information yet.
      */
-    if (ent->ifa_addr->sa_family == PF_PACKET) {
+    if (ent->ifa_addr->sa_family == PF_PACKET)
       continue;
-    }
 
     address->name = strdup(ent->ifa_name);
 
@@ -777,9 +777,28 @@ uv_err_t uv_interface_addresses(uv_interface_address_t** addresses,
       address->address.address4 = *((struct sockaddr_in *)ent->ifa_addr);
     }
 
-    address->is_internal = ent->ifa_flags & IFF_LOOPBACK ? 1 : 0;
+    address->is_internal = !!(ent->ifa_flags & IFF_LOOPBACK);
 
     address++;
+  }
+
+  /* Fill in physical addresses for each interface */
+  for (ent = addrs; ent != NULL; ent = ent->ifa_next) {
+    if (!((ent->ifa_flags & IFF_UP) && (ent->ifa_flags & IFF_RUNNING)) ||
+        (ent->ifa_addr == NULL) ||
+        (ent->ifa_addr->sa_family != PF_PACKET)) {
+      continue;
+    }
+
+    address = *addresses;
+
+    for (i = 0; i < (*count); i++) {
+      if (strcmp(address->name, ent->ifa_name) == 0) {
+        sll = (struct sockaddr_ll*)ent->ifa_addr;
+        memcpy(address->phys_addr, sll->sll_addr, sizeof(address->phys_addr));
+      }
+      address++;
+    }
   }
 
   freeifaddrs(addrs);
