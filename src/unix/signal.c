@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 
 
 typedef struct {
@@ -53,8 +54,15 @@ RB_GENERATE_STATIC(uv__signal_tree_s,
                    uv_signal_s, tree_entry,
                    uv__signal_compare)
 
+clockid_t uv__selected_clock_id = CLOCK_MONOTONIC;
+
 
 static void uv__signal_global_init(void) {
+  char *clock_id = getenv("UV_CLOCK_ID");
+  if (clock_id && strcmp(clock_id, "CLOCK_MONOTONIC_RAW") == 0)
+    uv__selected_clock_id = CLOCK_MONOTONIC_RAW;
+  else if (clock_id && strcmp(clock_id, "CLOCK_MONOTONIC_COARSE") == 0)
+    uv__selected_clock_id = CLOCK_MONOTONIC_COARSE;
   if (uv__make_pipe(uv__signal_lock_pipefd, 0))
     abort();
 

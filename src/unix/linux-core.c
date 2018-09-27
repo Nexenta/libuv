@@ -60,6 +60,8 @@
 # define CLOCK_BOOTTIME 7
 #endif
 
+extern clockid_t uv__selected_clock_id;
+
 static int read_models(unsigned int numcpus, uv_cpu_info_t* ci);
 static int read_times(unsigned int numcpus, uv_cpu_info_t* ci);
 static void read_speeds(unsigned int numcpus, uv_cpu_info_t* ci);
@@ -344,7 +346,7 @@ update_timeout:
 
 uint64_t uv__hrtime(void) {
   struct timespec ts;
-  clock_gettime(CLOCK_MONOTONIC, &ts);
+  clock_gettime(uv__selected_clock_id, &ts);
   return (((uint64_t) ts.tv_sec) * NANOSEC + ts.tv_nsec);
 }
 
