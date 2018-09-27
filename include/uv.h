@@ -1876,6 +1876,8 @@ UV_EXTERN void uv_disable_stdio_inheritance(void);
  */
 UV_EXTERN int uv_dlopen(const char* filename, uv_lib_t* lib);
 
+UV_EXTERN int uv_dlopen2(const char* filename, uv_lib_t* lib, int flags);
+
 /*
  * Close the shared library.
  */
