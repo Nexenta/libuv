@@ -28,6 +28,7 @@
 static uv_once_t once = UV_ONCE_INIT;
 static uv_cond_t cond;
 static uv_mutex_t mutex;
+static unsigned int idle_threads;
 static unsigned int nthreads;
 static uv_thread_t* threads;
 static uv_thread_t default_threads[DEFAULT_THREADS_SIZE];
@@ -59,8 +60,11 @@ static void worker(void* arg) {
   for (;;) {
     uv_mutex_lock(&mutex);
 
-    while (ngx_queue_empty(&wq))
+    while (ngx_queue_empty(&wq)) {
+      idle_threads++;
       uv_cond_wait(&cond, &mutex);
+      idle_threads--;
+    }
 
     q = ngx_queue_head(&wq);
 
@@ -103,7 +107,8 @@ static void post(ngx_queue_t* q) {
   }
   uv_mutex_lock(&mutex);
   ngx_queue_insert_tail(&wq, q);
-  uv_cond_signal(&cond);
+  if (idle_threads > 0)
+    uv_cond_signal(&cond);
   uv_mutex_unlock(&mutex);
 }
 
