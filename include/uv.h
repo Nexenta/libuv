@@ -1481,6 +1481,8 @@ UV_EXTERN int uv_queue_work(uv_loop_t* loop, uv_work_t* req,
  */
 UV_EXTERN int uv_cancel(uv_req_t* req);
 
+UV_EXTERN int uv_wq_empty(uv_loop_t* loop);
+
 
 struct uv_cpu_info_s {
   char* model;

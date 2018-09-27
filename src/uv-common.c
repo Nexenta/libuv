@@ -473,3 +473,10 @@ int uv_loop_configure(uv_loop_t* loop, uv_loop_option option, ...) {
 
   return err;
 }
+
+int uv_wq_empty(uv_loop_t* loop) {
+  uv_mutex_lock(&loop->wq_mutex);
+  int rc = ngx_queue_empty(&loop->wq);
+  uv_mutex_unlock(&loop->wq_mutex);
+  return rc;
+}
