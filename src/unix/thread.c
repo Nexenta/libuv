@@ -25,6 +25,7 @@
 #include <pthread.h>
 #include <assert.h>
 #include <errno.h>
+#include <unistd.h>
 
 #if defined(__APPLE__) && defined(__MACH__)
 #include <sys/time.h>
@@ -74,8 +75,16 @@ void uv_mutex_destroy(uv_mutex_t* mutex) {
 
 
 void uv_mutex_lock(uv_mutex_t* mutex) {
-  if (pthread_mutex_lock(mutex))
-    abort();
+  int r;
+
+_again:
+  r = pthread_mutex_lock(mutex);
+  if (r) {
+    if (r != EAGAIN)
+      usleep(1000);
+    usleep(1);
+    goto _again;
+  }
 }
 
 
@@ -95,8 +104,16 @@ int uv_mutex_trylock(uv_mutex_t* mutex) {
 
 
 void uv_mutex_unlock(uv_mutex_t* mutex) {
-  if (pthread_mutex_unlock(mutex))
-    abort();
+  int r;
+
+_again:
+  r = pthread_mutex_unlock(mutex);
+  if (r) {
+    if (r != EAGAIN)
+      usleep(1000);
+    usleep(1);
+    goto _again;
+  }
 }
 
 
