@@ -124,3 +124,11 @@ int uv__loop_configure(uv_loop_t* loop, uv_loop_option option, va_list ap) {
   loop->flags |= UV_LOOP_BLOCK_SIGPROF;
   return 0;
 }
+
+int uv_workers_empty(uv_loop_t* loop) {
+  int rc;
+  uv_mutex_lock(&loop->wq_mutex);
+  rc = !loop->workers_count;
+  uv_mutex_unlock(&loop->wq_mutex);
+  return rc;
+}

@@ -172,6 +172,7 @@ typedef struct {
   ngx_queue_t wq;                                                             \
   uv_mutex_t wq_mutex;                                                        \
   uv_async_t wq_async;                                                        \
+  volatile int workers_count;                                                 \
   uv_handle_t* closing_handles;                                               \
   ngx_queue_t process_handles[1];                                             \
   ngx_queue_t prepare_handles;                                                \

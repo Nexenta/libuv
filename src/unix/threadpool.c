@@ -21,6 +21,7 @@
 
 #include "internal.h"
 #include <stdlib.h>
+#include <string.h>
 
 #define MAX_THREADPOOL_SIZE 1024
 #define DEFAULT_THREADS_SIZE 128
@@ -32,7 +33,7 @@ static uv_thread_t* threads;
 static uv_thread_t default_threads[DEFAULT_THREADS_SIZE];
 static ngx_queue_t exit_message;
 static ngx_queue_t wq;
-static volatile int initialized;
+static volatile int initialized = 0;
 
 
 static void uv__cancelled(struct uv__work* w) {
@@ -84,6 +85,7 @@ static void worker(void* arg) {
     uv_mutex_lock(&w->loop->wq_mutex);
     w->work = NULL;  /* Signal uv_cancel() that the work req is done
                         executing. */
+    w->loop->workers_count --;
     ngx_queue_insert_tail(&w->loop->wq, &w->wq);
     uv_async_send(&w->loop->wq_async);
     uv_mutex_unlock(&w->loop->wq_mutex);
@@ -92,6 +94,13 @@ static void worker(void* arg) {
 
 
 static void post(ngx_queue_t* q) {
+  struct uv__work* w;
+  if(q != &exit_message) {
+    w = ngx_queue_data(q, struct uv__work, wq);
+    uv_mutex_lock(&w->loop->wq_mutex);
+    w->loop->workers_count ++;
+    uv_mutex_unlock(&w->loop->wq_mutex);
+  }
   uv_mutex_lock(&mutex);
   ngx_queue_insert_tail(&wq, q);
   uv_cond_signal(&cond);
@@ -183,8 +192,10 @@ static int uv__work_cancel(uv_loop_t* loop, uv_req_t* req, struct uv__work* w) {
   uv_mutex_lock(&w->loop->wq_mutex);
 
   cancelled = !ngx_queue_empty(&w->wq) && w->work != NULL;
-  if (cancelled)
+  if (cancelled) {
     ngx_queue_remove(&w->wq);
+    w->loop->workers_count --;
+  }
 
   uv_mutex_unlock(&w->loop->wq_mutex);
   uv_mutex_unlock(&mutex);
